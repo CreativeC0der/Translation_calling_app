@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+
+var app = require('../app');
+var http = require('http');
+var { Server } = require('socket.io')
+
+var port = '3000'
+app.set('port', port);
+
+var server = http.createServer(app);
+var io = new Server(server)
+
+var Users = {}
+
+io.on('connection', (socket) => {
+
+  console.log('User Connected with ID: ' + socket.id);
+  io.emit('user-list-changed', Users);
+
+  socket.on('new-user-registered', (user) => {
+    console.log(user + ' regisetered');
+    Users[user] = socket.id;
+    io.emit('user-list-changed', Users);
+  })
+
+  socket.on('end-call', ({ from, to }) => {
+    console.log(socket.id + ' disconnected');
+    io.to(Users[to]).emit('end-call')
+  })
+
+  socket.on('offer', ({ from, to, offer }) => {
+    if (Users[to]) {
+      io.to(Users[to]).emit('offer', { from, to, offer });
+    }
+  });
+
+  socket.on('answer', ({ from, to, answer }) => {
+    if (Users[to]) {
+      io.to(Users[to]).emit('answer', { from, to, answer });
+    }
+  });
+
+  socket.on('ice-candidate-added', ({ to, candidate }) => {
+    if (Users[to]) {
+      io.to(Users[to]).emit('ice-candidate-added', candidate);
+    }
+  });
+})
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+
